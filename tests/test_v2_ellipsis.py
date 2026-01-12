@@ -104,3 +104,41 @@ class TestRepairLog:
         repair = repair_log[0]
         assert repair.kind == RepairKind.TRUNCATION_MARKER
         assert "..." in repair.original or "…" in repair.original
+
+
+class TestEllipsisWithWhitespace:
+    """Test ellipsis with trailing whitespace."""
+
+    def test_ascii_ellipsis_with_trailing_spaces(self, repair_log: list) -> None:
+        """ASCII ellipsis followed by spaces before bracket."""
+        # Covers normalizers.py line 562
+        result = loads_relaxed("[1, 2, ...   ]", repair_log=repair_log)
+        assert result == [1, 2]
+        assert len(repair_log) == 1
+
+    def test_ascii_ellipsis_with_trailing_newline(self, repair_log: list) -> None:
+        """ASCII ellipsis followed by newline before bracket."""
+        result = loads_relaxed("[1, 2, ...\n]", repair_log=repair_log)
+        assert result == [1, 2]
+
+    def test_ascii_ellipsis_with_trailing_tab(self, repair_log: list) -> None:
+        """ASCII ellipsis followed by tab before bracket."""
+        result = loads_relaxed("[1, 2, ...\t]", repair_log=repair_log)
+        assert result == [1, 2]
+
+    def test_unicode_ellipsis_with_trailing_spaces(self, repair_log: list) -> None:
+        """Unicode ellipsis followed by spaces before bracket."""
+        # Covers normalizers.py line 592
+        result = loads_relaxed("[1, 2, …   ]", repair_log=repair_log)
+        assert result == [1, 2]
+        assert len(repair_log) == 1
+
+    def test_unicode_ellipsis_with_trailing_newline(self, repair_log: list) -> None:
+        """Unicode ellipsis followed by newline before bracket."""
+        result = loads_relaxed("[1, 2, …\n]", repair_log=repair_log)
+        assert result == [1, 2]
+
+    def test_unicode_ellipsis_with_mixed_whitespace(self, repair_log: list) -> None:
+        """Unicode ellipsis followed by mixed whitespace."""
+        result = loads_relaxed("[1, 2, … \t\n ]", repair_log=repair_log)
+        assert result == [1, 2]

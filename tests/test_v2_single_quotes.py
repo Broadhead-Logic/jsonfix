@@ -139,3 +139,35 @@ class TestRepairLog:
         repair = repair_log[0]
         assert repair.original == "'a'"
         assert repair.replacement == '"a"'
+
+
+class TestEscapeSequencesInSingleQuotes:
+    """Test escape sequences inside single-quoted strings."""
+
+    def test_escaped_double_quote_inside_single(self, repair_log: list) -> None:
+        """Escaped double quote inside single-quoted string."""
+        # Covers normalizers.py lines 162-164
+        result = loads_relaxed(r"{'text': 'say \"hi\"'}", repair_log=repair_log)
+        assert result == {"text": 'say "hi"'}
+
+    def test_escaped_backslash_n_inside_single(self, repair_log: list) -> None:
+        """Escaped backslash-n inside single-quoted string."""
+        # Covers normalizers.py lines 165-168
+        result = loads_relaxed(r"{'text': 'line1\nline2'}", repair_log=repair_log)
+        assert result == {"text": "line1\nline2"}
+
+    def test_escaped_tab_inside_single(self, repair_log: list) -> None:
+        """Escaped backslash-t inside single-quoted string."""
+        result = loads_relaxed(r"{'text': 'col1\tcol2'}", repair_log=repair_log)
+        assert result == {"text": "col1\tcol2"}
+
+    def test_escaped_backslash_inside_single(self, repair_log: list) -> None:
+        """Escaped backslash inside single-quoted string."""
+        result = loads_relaxed(r"{'path': 'C:\\Users'}", repair_log=repair_log)
+        assert result == {"path": "C:\\Users"}
+
+    def test_unclosed_single_quote_causes_error(self) -> None:
+        """Unclosed single quote causes JSON decode error."""
+        # Covers normalizers.py lines 206-208
+        with pytest.raises(json.JSONDecodeError):
+            loads_relaxed("{'text': 'unclosed")
