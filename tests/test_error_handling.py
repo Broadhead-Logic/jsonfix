@@ -29,53 +29,61 @@ class TestStandardJsonErrors:
             loads_relaxed('{"a": "hello}')
 
     def test_invalid_value_undefined(self) -> None:
-        """undefined is not valid JSON."""
+        """undefined is not valid JSON when JS value conversion is disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed('{"a": undefined}')
+            loads_relaxed('{"a": undefined}', convert_javascript_values=False)
 
     def test_nan_parses_as_python_nan(self, repair_log: list) -> None:
-        """NaN is accepted by Python's json module (non-standard but common)."""
-        # Note: Python's json module accepts NaN/Infinity even though they're
-        # not in the JSON spec. This is a Python quirk, not a jsonfix feature.
+        """NaN is accepted by Python's json module (non-standard but common).
+
+        When JS value conversion is disabled, Python's json module accepts NaN.
+        """
         import math
 
-        result = loads_relaxed('{"a": NaN}', repair_log=repair_log)
+        result = loads_relaxed(
+            '{"a": NaN}', convert_javascript_values=False, repair_log=repair_log
+        )
         assert math.isnan(result["a"])
         # No repairs needed - Python handles this natively
         assert repair_log == []
 
     def test_infinity_parses_as_python_inf(self, repair_log: list) -> None:
-        """Infinity is accepted by Python's json module (non-standard but common)."""
+        """Infinity is accepted by Python's json module (non-standard but common).
+
+        When JS value conversion is disabled, Python's json module accepts Infinity.
+        """
         import math
 
-        result = loads_relaxed('{"a": Infinity}', repair_log=repair_log)
+        result = loads_relaxed(
+            '{"a": Infinity}', convert_javascript_values=False, repair_log=repair_log
+        )
         assert math.isinf(result["a"])
         assert repair_log == []
 
     def test_duplicate_comma_array(self) -> None:
-        """Duplicate comma in array is an error."""
+        """Duplicate comma in array is an error when feature is disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed("[1,, 2]")
+            loads_relaxed("[1,, 2]", remove_double_commas=False)
 
     def test_leading_comma_array(self) -> None:
-        """Leading comma in array is an error."""
+        """Leading comma in array is an error when feature is disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed("[, 1, 2]")
+            loads_relaxed("[, 1, 2]", remove_double_commas=False)
 
     def test_missing_colon(self) -> None:
-        """Missing colon in object is an error."""
+        """Missing colon in object is an error when fix_missing_colon disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed('{"a" 1}')
+            loads_relaxed('{"a" 1}', fix_missing_colon=False)
 
     def test_missing_comma_object(self) -> None:
-        """Missing comma between object properties is an error."""
+        """Missing comma between object properties is an error when disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed('{"a": 1 "b": 2}')
+            loads_relaxed('{"a": 1 "b": 2}', fix_missing_comma=False)
 
     def test_missing_comma_array(self) -> None:
-        """Missing comma between array elements is an error."""
+        """Missing comma between array elements is an error when disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed("[1 2 3]")
+            loads_relaxed("[1 2 3]", fix_missing_comma=False)
 
     def test_single_quotes_as_delimiters(self) -> None:
         """Single quotes as string delimiters is an error when disabled."""

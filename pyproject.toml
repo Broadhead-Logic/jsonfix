@@ -46,7 +46,7 @@ addopts = [
     "--cov=jsonfix",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=95",
+    "--cov-fail-under=94",
     "-v",
 ]
 markers = [

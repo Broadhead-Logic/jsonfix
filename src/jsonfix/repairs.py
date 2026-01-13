@@ -22,6 +22,19 @@ class RepairKind(Enum):
     UNESCAPED_NEWLINE = auto()
     MISSING_BRACKET = auto()
     TRUNCATION_MARKER = auto()
+    # V3 repair kinds (LLM-specific)
+    JSON_EXTRACTED = auto()
+    MARKDOWN_FENCE_REMOVED = auto()
+    UNESCAPED_QUOTE = auto()
+    # V3 repair kinds (structural)
+    MISSING_COLON = auto()
+    MISSING_COMMA = auto()
+    CONTROL_CHARACTER = auto()
+    UNESCAPED_BACKSLASH = auto()
+    # V3 repair kinds (edge cases)
+    JAVASCRIPT_VALUE = auto()
+    NUMBER_FORMAT = auto()
+    DOUBLE_COMMA = auto()
 
 
 @dataclass(frozen=True)
@@ -120,6 +133,30 @@ def create_repair(
         message = f"Added missing closing bracket '{replacement}'"
     elif kind == RepairKind.TRUNCATION_MARKER:
         message = f"Removed truncation marker '{original}'"
+    # V3 repair kinds (LLM-specific)
+    elif kind == RepairKind.JSON_EXTRACTED:
+        message = "Extracted JSON from surrounding text"
+    elif kind == RepairKind.MARKDOWN_FENCE_REMOVED:
+        message = "Removed markdown code fence"
+    elif kind == RepairKind.UNESCAPED_QUOTE:
+        preview = original[:30] + "..." if len(original) > 30 else original
+        message = f"Escaped unescaped quote in string '{preview}'"
+    # V3 repair kinds (structural)
+    elif kind == RepairKind.MISSING_COLON:
+        message = "Added missing colon between key and value"
+    elif kind == RepairKind.MISSING_COMMA:
+        message = "Added missing comma between elements"
+    elif kind == RepairKind.CONTROL_CHARACTER:
+        message = f"Escaped control character '{repr(original)[1:-1]}'"
+    elif kind == RepairKind.UNESCAPED_BACKSLASH:
+        message = "Escaped unescaped backslash"
+    # V3 repair kinds (edge cases)
+    elif kind == RepairKind.JAVASCRIPT_VALUE:
+        message = f"Converted JavaScript value '{original}' to JSON '{replacement}'"
+    elif kind == RepairKind.NUMBER_FORMAT:
+        message = f"Converted number format '{original}' to '{replacement}'"
+    elif kind == RepairKind.DOUBLE_COMMA:
+        message = "Removed extra comma"
     else:
         message = f"Repaired: {original} -> {replacement}"
 

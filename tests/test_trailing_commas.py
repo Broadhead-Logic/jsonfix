@@ -74,22 +74,22 @@ class TestArrayTrailingCommas:
 
 
 class TestMultipleCommasError:
-    """Test that multiple consecutive commas are errors, not trailing commas."""
+    """Test that multiple consecutive commas are errors when feature is disabled."""
 
     def test_multiple_commas_error_array(self) -> None:
-        """Multiple commas in array should error."""
+        """Multiple commas in array should error when feature is disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed("[1,,]")
+            loads_relaxed("[1,,]", remove_double_commas=False)
 
     def test_multiple_commas_error_array_middle(self) -> None:
-        """Multiple commas in middle of array should error."""
+        """Multiple commas in middle of array should error when feature is disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed("[1,, 2]")
+            loads_relaxed("[1,, 2]", remove_double_commas=False)
 
     def test_multiple_commas_in_object(self) -> None:
-        """Multiple commas in object should error."""
+        """Multiple commas in object should error when feature is disabled."""
         with pytest.raises(json.JSONDecodeError):
-            loads_relaxed('{"a": 1,, "b": 2}')
+            loads_relaxed('{"a": 1,, "b": 2}', remove_double_commas=False)
 
 
 class TestRepairLog:

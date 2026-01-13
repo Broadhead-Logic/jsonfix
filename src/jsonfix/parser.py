@@ -8,10 +8,13 @@ import warnings
 from typing import IO, Any, Literal
 
 from .normalizers import (
-    convert_python_literals,
     convert_single_quote_strings,
+    escape_control_characters,
     escape_newlines_in_strings,
-    normalize_quotes,
+    extract_json_from_text,
+    fix_missing_colons,
+    fix_missing_commas,
+    fix_unescaped_backslash as _fix_unescaped_backslash,
     quote_unquoted_keys,
     remove_ellipsis_markers,
 )
@@ -80,6 +83,14 @@ def _strip_comments(
         if not in_string:
             # Single-line comment: //
             if char == "/" and i + 1 < len(text) and text[i + 1] == "/":
+                # Check if this is a URL protocol (e.g., https://)
+                # URL protocols have : immediately before //
+                if i > 0 and text[i - 1] == ":":
+                    # This is likely a URL, not a comment
+                    result.append(char)
+                    i += 1
+                    continue
+
                 # Find end of line
                 end = text.find("\n", i)
                 if end == -1:
@@ -338,6 +349,19 @@ def loads_relaxed(
     escape_newlines: bool = True,
     auto_close_brackets: bool = True,
     remove_ellipsis: bool = True,
+    # V3 options (LLM-specific)
+    extract_json: bool = True,
+    remove_markdown_fences: bool = True,
+    fix_unescaped_quotes: bool = True,
+    # V3 options (Structural)
+    fix_missing_colon: bool = True,
+    fix_missing_comma: bool = True,
+    escape_control_chars: bool = True,
+    fix_unescaped_backslash: bool = True,
+    # V3 options (Edge cases)
+    convert_javascript_values: bool = True,
+    convert_number_formats: bool = True,
+    remove_double_commas: bool = True,
     # Common options
     repair_log: list[Repair] | None = None,
     on_repair: Literal["ignore", "warn", "error"] = "ignore",
@@ -354,6 +378,16 @@ def loads_relaxed(
     - Literal newlines in strings escaped (V2)
     - Missing closing brackets auto-added (V2)
     - Truncation markers (...) removed (V2)
+    - JSON extracted from preamble/postamble text (V3)
+    - Markdown code fences removed (V3)
+    - Unescaped quotes in strings fixed (V3)
+    - Missing colons inserted between keys and values (V3)
+    - Missing commas inserted between elements (V3)
+    - Control characters escaped (tabs, etc.) (V3)
+    - Unescaped backslashes fixed (V3)
+    - JavaScript values converted (NaN, Infinity, undefined → null) (V3)
+    - Non-decimal number formats converted (0xFF, 0o777, 0b1010) (V3)
+    - Double/empty commas removed (V3)
 
     Args:
         s: JSON string (possibly with relaxed syntax)
@@ -367,6 +401,16 @@ def loads_relaxed(
         escape_newlines: Escape literal newlines in strings
         auto_close_brackets: Add missing closing brackets at end
         remove_ellipsis: Remove truncation markers like ...
+        extract_json: Extract JSON from surrounding text (preamble/postamble)
+        remove_markdown_fences: Remove ```json code fences
+        fix_unescaped_quotes: Escape unescaped quotes in strings
+        fix_missing_colon: Insert missing colons between keys and values
+        fix_missing_comma: Insert missing commas between elements
+        escape_control_chars: Escape control characters in strings
+        fix_unescaped_backslash: Escape invalid backslash sequences
+        convert_javascript_values: Convert NaN, Infinity, undefined to null
+        convert_number_formats: Convert 0xFF, 0o777, 0b1010 to decimal
+        remove_double_commas: Remove double/empty commas
         repair_log: Optional list to collect Repair objects documenting fixes
         on_repair: Action when repair needed:
             - "ignore": Parse silently (default)
@@ -397,6 +441,16 @@ def loads_relaxed(
     if processed.startswith("\ufeff"):
         processed = processed[1:]
 
+    # Step 0.1: Remove markdown fences (V3 - must be first to unwrap fenced JSON)
+    if remove_markdown_fences:
+        from .normalizers import remove_markdown_fences as _remove_markdown_fences
+
+        processed = _remove_markdown_fences(processed, actual_log)
+
+    # Step 0.2: Extract JSON from surrounding text (V3 - after fences, before other processing)
+    if extract_json:
+        processed = extract_json_from_text(processed, actual_log)
+
     # Step 1: Normalize smart quotes (V1)
     if normalize_quotes:
         # Import here to use the function (avoiding name collision with parameter)
@@ -419,17 +473,66 @@ def loads_relaxed(
 
         processed = _convert_python_literals(processed, actual_log)
 
-    # Step 5: Escape newlines in strings (V2)
+    # Step 5: Fix unescaped backslashes (V3) - FIRST in escape processing
+    # so that user-provided backslashes are escaped before other escape
+    # sequences are added by subsequent steps
+    if fix_unescaped_backslash:
+        processed = _fix_unescaped_backslash(processed, actual_log)
+
+    # Step 5.1: Escape newlines in strings (V2) - after backslash fix
     if escape_newlines:
         processed = escape_newlines_in_strings(processed, actual_log)
+
+    # Step 5.2: Escape control characters (V3) - after backslash fix
+    # This adds proper escape sequences for actual control chars
+    if escape_control_chars:
+        processed = escape_control_characters(processed, actual_log)
 
     # Step 6: Remove ellipsis markers (V2)
     if remove_ellipsis:
         processed = remove_ellipsis_markers(processed, actual_log)
 
-    # Step 7: Strip comments (V1)
+    # Step 7: Strip comments (V1) - must be before other structural fixes
+    # so comments don't confuse the heuristics
     if allow_comments:
         processed = _strip_comments(processed, actual_log)
+
+    # Step 7.1: Convert non-decimal number formats (V3 - hex, octal, binary → decimal)
+    # MUST run before fix_missing_colons/commas so those normalizers see valid
+    # decimal numbers instead of misinterpreting 0xFF as two tokens.
+    if convert_number_formats:
+        from .normalizers import convert_number_formats as _convert_number_formats
+
+        processed = _convert_number_formats(processed, actual_log)
+
+    # Step 7.2: Convert JavaScript values (V3 - NaN, Infinity, undefined → null)
+    # MUST run before fix_missing_colons/commas so those normalizers see valid
+    # null values instead of unknown identifiers like "NaN".
+    if convert_javascript_values:
+        from .normalizers import convert_javascript_values as _convert_js_values
+
+        processed = _convert_js_values(processed, actual_log)
+
+    # Step 7.3: Fix missing colons (V3) - structural, establishes key-value structure
+    # so that '{"name" "John"}' becomes '{"name": "John"}'
+    # Runs after number/JS conversion so values are recognized correctly.
+    if fix_missing_colon:
+        processed = fix_missing_colons(processed, actual_log)
+
+    # Step 7.4: Fix unescaped quotes (V3) - AFTER colons, BEFORE commas
+    # After colons are in place, we can identify string boundaries.
+    # Must run before fix_missing_commas so comma fixer sees valid string boundaries.
+    # Example: '{"text": "He said "hello" today"}' needs quotes fixed first.
+    if fix_unescaped_quotes:
+        from .normalizers import fix_unescaped_quotes as _fix_unescaped_quotes
+
+        processed = _fix_unescaped_quotes(processed, actual_log)
+
+    # Step 7.5: Fix missing commas (V3) - structural, AFTER quote/number fixing
+    # Now that strings have proper boundaries and numbers are decimal, we can
+    # safely detect missing commas.
+    if fix_missing_comma:
+        processed = fix_missing_commas(processed, actual_log)
 
     # Step 8: Auto-close brackets (V2 - must be before trailing comma removal)
     # so that '{"a": 1,' becomes '{"a": 1,}' and then trailing comma is removed
@@ -439,6 +542,12 @@ def loads_relaxed(
     # Step 9: Remove trailing commas (V1 - must be after auto-close)
     if allow_trailing_commas:
         processed = _remove_trailing_commas(processed, actual_log)
+
+    # Step 10: Remove double/empty commas (V3 - edge case cleanup)
+    if remove_double_commas:
+        from .normalizers import remove_double_commas as _remove_double_commas
+
+        processed = _remove_double_commas(processed, actual_log)
 
     # Check if any repairs were made
     if actual_log:
