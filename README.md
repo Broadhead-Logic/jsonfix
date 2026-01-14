@@ -6,25 +6,20 @@ Parse "almost JSON" with trailing commas, comments, smart quotes, and more.
 
 ## Installation
 
-### From PyPI
-
 ```bash
-pip install jsonfix
-```
-
-### From Source
-
-```bash
+# Clone and install from source
 git clone https://github.com/Broadhead-Logic/jsonfix.git
 cd jsonfix
 pip install -e .
 ```
 
+> **PyPI:** Coming soon. For now, install from source.
+
 ### Development
 
 ```bash
 pip install -e ".[dev]"
-pytest  # Run tests (365 tests, 98% coverage)
+pytest  # Run tests (589 tests, 94%+ coverage)
 ```
 
 ## Quick Start
@@ -55,6 +50,27 @@ for repair in repairs:
     print(f"Line {repair.line}: {repair.message}")
 # Line 1: Removed multi-line comment '/* comment */'
 # Line 1: Removed trailing comma
+```
+
+## Behavior & Safety
+
+### What jsonfix Does
+- Repairs common JSON syntax errors from LLM outputs
+- Logs all repairs for transparency and debugging
+- Provides options to warn or error on repairs
+
+### What jsonfix Does NOT Do
+- **Not a validator**: Don't use it to "sanitize" untrusted/hostile input
+- **Not lossless**: Repairs may change semantics (e.g., `NaN` → `null`)
+
+### Production Recommendations
+
+```python
+# Recommended: Make repairs visible in production
+result = loads_relaxed(text, on_repair="warn")
+
+# Strict mode: Fail on any repair needed
+result = loads_relaxed(text, on_repair="error")
 ```
 
 ## Features

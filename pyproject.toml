@@ -34,8 +34,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jsonfix/jsonfix"
-Repository = "https://github.com/jsonfix/jsonfix"
+Homepage = "https://github.com/Broadhead-Logic/jsonfix"
+Repository = "https://github.com/Broadhead-Logic/jsonfix"
+Issues = "https://github.com/Broadhead-Logic/jsonfix/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jsonfix"]
