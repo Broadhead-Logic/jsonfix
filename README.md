@@ -22,6 +22,45 @@ pip install -e ".[dev]"
 pytest  # Run tests (589 tests, 94%+ coverage)
 ```
 
+## Command-Line Usage
+
+Fix JSON files directly from the terminal:
+
+```bash
+# Fix file in-place
+jsonfix config.json
+
+# Fix with verbose output
+jsonfix config.json -v
+# Fixed 3 issues in config.json:
+#   Line 5: Removed trailing comma
+#   Line 8: Converted smart quote '"' to '"'
+#   Line 12: Removed single-line comment
+
+# Output to different file
+jsonfix input.json -o output.json
+
+# Create backup before overwriting
+jsonfix config.json -b
+
+# Dry run (show what would change)
+jsonfix config.json --dry-run
+
+# Read from stdin, write to stdout
+echo '{"a": 1,}' | jsonfix -
+```
+
+### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-o, --output FILE` | Output file (default: overwrite input). Use `-` for stdout. |
+| `-v, --verbose` | Show repairs made |
+| `-b, --backup` | Create `.bak` backup before overwriting |
+| `--dry-run` | Show what would change without writing |
+| `--version` | Show version |
+| `--help` | Show help |
+
 ## Quick Start
 
 ```python
